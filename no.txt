@@ -1,0 +1,155 @@
+-- Enhanced AudioAPI Module
+local AudioAPI = {
+    GroupIDs = {
+        17381239,
+        34085849
+    },
+    CurrentSound = nil
+}
+
+-- Function to fetch audios from groups
+function AudioAPI:FetchGroupAudios(groupId)
+    local audios = {}
+    local success, result = pcall(function()
+        local url = string.format("https://apis.roblox.com/asset-permissions-api/v1/assets?groupId=%d&assetType=Audio", groupId)
+        return game:GetService("HttpService"):GetAsync(url)
+    end)
+    
+    if success then
+        local data = game:GetService("HttpService"):JSONDecode(result)
+        for _, audio in pairs(data) do
+            table.insert(audios, {
+                id = audio.assetId,
+                name = audio.name
+            })
+        end
+    end
+    return audios
+end
+
+-- Function to play audio through boombox
+function AudioAPI:PlayAudio(audioId)
+    local player = game:GetService("Players").LocalPlayer
+    local character = player.Character or player.CharacterAdded:Wait()
+    
+    -- Check if player has boombox
+    local boombox = character:FindFirstChild("BoomBox") or player.Backpack:FindFirstChild("BoomBox")
+    if not boombox then
+        return false, "No boombox found"
+    end
+    
+    -- Remote event to play audio
+    local remote = boombox:FindFirstChild("Remote")
+    if remote then
+        remote:FireServer("PlaySong", audioId)
+        self.CurrentSound = boombox:FindFirstChild("Handle") and boombox.Handle:FindFirstChild("Sound")
+        return true
+    end
+    return false, "Failed to play audio"
+end
+
+-- Function to stop current audio
+function AudioAPI:StopAudio()
+    if self.CurrentSound then
+        self.CurrentSound:Stop()
+        self.CurrentSound = nil
+        return true
+    end
+    return false
+end
+
+-- Function to set playback speed
+function AudioAPI:SetSpeed(speed)
+    if self.CurrentSound then
+        self.CurrentSound.PlaybackSpeed = speed
+        return true
+    end
+    return false
+end
+
+-- Function to set distortion effect
+function AudioAPI:SetDistortion(level)
+    if self.CurrentSound then
+        local SoundEffect = Instance.new("DistortionSoundEffect")
+        SoundEffect.Level = level
+        SoundEffect.Parent = self.CurrentSound
+        return true
+    end
+    return false
+end
+
+-- Return the API module
+return AudioAPI
+
+-- UI Integration Script
+local AudioAPI = require(game.ReplicatedStorage:WaitForChild("AudioAPI"))
+
+-- UI Elements
+local screenGui = Instance.new("ScreenGui", game.Players.LocalPlayer.PlayerGui)
+local mainFrame = Instance.new("Frame", screenGui)
+mainFrame.Size = UDim2.new(0, 300, 0, 300)
+mainFrame.Position = UDim2.new(0.5, -150, 0.5, -150)
+mainFrame.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+
+local playButton = Instance.new("TextButton", mainFrame)
+playButton.Text = "Play"
+playButton.Size = UDim2.new(0, 100, 0, 50)
+playButton.Position = UDim2.new(0.1, 0, 0.2, 0)
+
+local stopButton = Instance.new("TextButton", mainFrame)
+stopButton.Text = "Stop"
+stopButton.Size = UDim2.new(0, 100, 0, 50)
+stopButton.Position = UDim2.new(0.5, 0, 0.2, 0)
+
+local speedSlider = Instance.new("TextBox", mainFrame)
+speedSlider.PlaceholderText = "Playback Speed (e.g., 1.0)"
+speedSlider.Size = UDim2.new(0, 200, 0, 50)
+speedSlider.Position = UDim2.new(0.1, 0, 0.5, 0)
+
+local distortionSlider = Instance.new("TextBox", mainFrame)
+distortionSlider.PlaceholderText = "Distortion Level (e.g., 0.5)"
+distortionSlider.Size = UDim2.new(0, 200, 0, 50)
+distortionSlider.Position = UDim2.new(0.1, 0, 0.7, 0)
+
+local audioIdInput = Instance.new("TextBox", mainFrame)
+audioIdInput.PlaceholderText = "Enter Audio ID"
+audioIdInput.Size = UDim2.new(0, 200, 0, 50)
+audioIdInput.Position = UDim2.new(0.1, 0, 0.1, 0)
+
+-- Functions for UI Buttons
+playButton.MouseButton1Click:Connect(function()
+    local audioId = tonumber(audioIdInput.Text)
+    if audioId then
+        AudioAPI:PlayAudio(audioId)
+    else
+        warn("Invalid Audio ID!")
+    end
+end)
+
+stopButton.MouseButton1Click:Connect(function()
+    AudioAPI:StopAudio()
+end)
+
+speedSlider.FocusLost:Connect(function(enterPressed)
+    if enterPressed then
+        local speed = tonumber(speedSlider.Text)
+        if speed then
+            AudioAPI:SetSpeed(speed)
+        else
+            warn("Invalid speed value!")
+        end
+    end
+end)
+
+distortionSlider.FocusLost:Connect(function(enterPressed)
+    if enterPressed then
+        local level = tonumber(distortionSlider.Text)
+        if level then
+            AudioAPI:SetDistortion(level)
+        else
+            warn("Invalid distortion level!")
+        end
+    end
+end)
+
+print("Boombox Exploit Loaded!")
